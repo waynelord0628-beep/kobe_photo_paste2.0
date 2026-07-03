@@ -1,0 +1,681 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kobe強強照片黏貼</title>
+  <style>
+    :root {
+      --bg: #eef1f5;
+      --panel: #ffffff;
+      --line: #c9ced8;
+      --ink: #1f2937;
+      --muted: #667085;
+      --blue: #2563eb;
+      --red: #dc2626;
+      --green: #15803d;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font-family: "Microsoft JhengHei", Arial, sans-serif; }
+    button, input, textarea, select { font: inherit; }
+    button { border: 0; border-radius: 6px; padding: 8px 12px; cursor: pointer; background: #e5e7eb; color: #111827; }
+    button:hover { filter: brightness(.96); }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    .primary { background: var(--blue); color: #fff; }
+    .danger { background: var(--red); color: #fff; }
+    .success { background: var(--green); color: #fff; }
+    .ghost { background: transparent; border: 1px solid var(--line); }
+    .icon { width: 36px; height: 36px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+    .app { max-width: 1180px; margin: 0 auto; padding: 24px; }
+    header { text-align: center; margin-bottom: 18px; }
+    h1 { margin: 0 0 6px; font-size: 28px; }
+    .sub { color: var(--muted); font-size: 14px; }
+    .toolbar { position: sticky; top: 12px; z-index: 10; display: grid; gap: 10px; margin-bottom: 18px; }
+    .bar { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; box-shadow: 0 3px 12px rgba(15,23,42,.07); }
+    .bar-left, .bar-right, .batch { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .count { color: var(--muted); font-size: 14px; }
+    .field { display: flex; align-items: center; gap: 8px; background: #f8fafc; border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; min-width: 260px; }
+    .field span { color: var(--muted); font-size: 13px; white-space: nowrap; }
+    .field input { border: 0; outline: 0; background: transparent; width: 100%; min-width: 120px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; padding-bottom: 80px; }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; box-shadow: 0 2px 8px rgba(15,23,42,.05); display: flex; flex-direction: column; gap: 10px; }
+    .card.dragging { opacity: .45; outline: 2px dashed var(--blue); }
+    .card-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .handle { cursor: grab; color: var(--muted); font-weight: 700; letter-spacing: 2px; user-select: none; }
+    .photo-box { position: relative; aspect-ratio: 16 / 10; background: #f3f4f6; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+    .photo-box img { width: 100%; height: 100%; object-fit: contain; display: block; }
+    .badge { position: absolute; right: 8px; bottom: 8px; background: rgba(17,24,39,.75); color: #fff; border-radius: 999px; padding: 3px 8px; font-size: 12px; }
+    .row { display: grid; grid-template-columns: 28px 1fr; gap: 8px; align-items: center; }
+    .row label { color: var(--muted); text-align: center; }
+    .row input, .row textarea { width: 100%; border: 1px solid var(--line); border-radius: 6px; padding: 8px; resize: vertical; }
+    .card-actions { display: flex; justify-content: space-between; gap: 8px; border-top: 1px solid #edf0f4; padding-top: 10px; }
+    .empty { grid-column: 1 / -1; text-align: center; color: var(--muted); border: 2px dashed var(--line); border-radius: 10px; padding: 64px 16px; background: rgba(255,255,255,.6); }
+    .modal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.62); z-index: 100; padding: 18px; }
+    .modal.show { display: flex; }
+    .modal-box { background: var(--panel); border-radius: 10px; width: min(980px, 100%); max-height: 92vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,.28); }
+    .modal-head, .modal-foot { padding: 14px 18px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .modal-foot { border-top: 1px solid var(--line); border-bottom: 0; justify-content: flex-end; }
+    .modal-body { padding: 18px; overflow: auto; }
+    .pending-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+    .pending { position: relative; aspect-ratio: 1; background: #f8fafc; border: 2px solid transparent; border-radius: 8px; overflow: hidden; cursor: grab; box-shadow: 0 1px 6px rgba(0,0,0,.08); }
+    .pending.dragging { border-color: var(--blue); opacity: .5; }
+    .pending img { width: 100%; height: 100%; object-fit: cover; }
+    .pending .num { position: absolute; top: 6px; left: 6px; background: rgba(0,0,0,.62); color: #fff; width: 26px; height: 26px; border-radius: 999px; display: grid; place-items: center; font-weight: 700; font-size: 13px; }
+    .pending .remove { position: absolute; top: 6px; right: 6px; }
+    .editor-box { width: min(1100px, 100%); }
+    .editor-tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .editor-tools button.active { background: #bfdbfe; color: #1d4ed8; }
+    .canvas-wrap { background: #d7dce3; display: flex; align-items: center; justify-content: center; padding: 16px; overflow: auto; min-height: 360px; }
+    canvas { background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.18); max-width: 100%; }
+    .text-pop { position: absolute; display: none; gap: 6px; background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 8px; box-shadow: 0 8px 22px rgba(0,0,0,.18); z-index: 120; }
+    .print-area { display: none; }
+    @page { size: A4 portrait; margin: 0; }
+    @media print {
+      body { background: #fff; }
+      .app, .modal { display: none !important; }
+      .print-area { display: block; }
+      .page { width: 210mm; height: 297mm; padding: 12mm 16mm 10mm; page-break-after: always; font-family: "DFKai-SB", "標楷體", serif; }
+      .print-title { text-align: center; font-size: 22pt; margin-bottom: 8mm; }
+      .records { height: 252mm; display: flex; flex-direction: column; gap: 6mm; }
+      .record { border: 1px solid #000; flex: 1; display: flex; flex-direction: column; min-height: 0; }
+      .record-photo { flex: 1; border-bottom: 1px solid #000; display: flex; align-items: center; justify-content: center; padding: 2mm; min-height: 0; }
+      .record-photo img { max-width: 100%; max-height: 100%; object-fit: contain; }
+      .record-info { height: 22mm; display: grid; grid-template-columns: 32% 1fr 16%; border-top: 0; }
+      .info-cell { border-right: 1px solid #000; display: flex; flex-direction: column; min-width: 0; }
+      .info-cell:last-child { border-right: 0; }
+      .info-label { background: #e5e7eb; border-bottom: 1px solid #000; text-align: center; font-weight: 700; font-size: 11pt; padding: 1mm 0; }
+      .info-value { flex: 1; padding: 1.5mm; font-size: 11pt; display: flex; align-items: center; justify-content: center; text-align: center; white-space: pre-wrap; overflow: hidden; }
+      .info-value.desc { align-items: flex-start; justify-content: flex-start; text-align: left; }
+      .info-value.no { font-size: 16pt; font-weight: 700; }
+      .blank { opacity: .3; }
+      .print-footer { text-align: right; font-size: 9pt; color: #666; margin-top: 2mm; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <h1>Kobe強強照片黏貼</h1>
+      <div class="sub">匯入照片、排序、標註、填寫地點與說明後，直接列印成每頁 2 張的 A4 紀錄表。</div>
+    </header>
+    <section class="toolbar">
+      <div class="bar">
+        <div class="bar-left">
+          <input id="fileInput" type="file" accept="image/*" multiple hidden>
+          <button class="primary" id="pickBtn">上傳 / 匯入照片</button>
+          <button id="saveProjectBtn">儲存專案</button>
+          <button id="loadProjectBtn">載入專案</button>
+          <input id="projectInput" type="file" accept="application/json" hidden>
+          <span class="count" id="countText">目前張數：0 張（0 頁）</span>
+        </div>
+        <div class="bar-right">
+          <button class="primary" id="printBtn" disabled>列印</button>
+          <button class="danger" id="clearBtn" disabled>清空</button>
+        </div>
+      </div>
+      <div class="bar">
+        <div class="batch">
+          <div class="field"><span>統一地點</span><input id="globalLocation" placeholder="只填入空白欄位"></div>
+          <div class="field"><span>統一說明</span><input id="globalDescription" placeholder="只填入空白欄位"></div>
+          <button class="success" id="applyBatchBtn">套用到空白欄位</button>
+        </div>
+      </div>
+    </section>
+    <section class="grid" id="photoGrid"></section>
+  </main>
+
+  <section class="print-area" id="printArea"></section>
+
+  <div class="modal" id="pendingModal">
+    <div class="modal-box">
+      <div class="modal-head">
+        <div>
+          <strong>匯入前預覽與排序</strong>
+          <div class="sub">拖曳圖片調整匯入順序，或刪除不需要的照片。</div>
+        </div>
+        <span class="count" id="pendingCount"></span>
+      </div>
+      <div class="modal-body"><div class="pending-grid" id="pendingGrid"></div></div>
+      <div class="modal-foot">
+        <button id="cancelImportBtn">取消</button>
+        <button class="primary" id="confirmImportBtn">確認匯入</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="editorModal">
+    <div class="modal-box editor-box">
+      <div class="modal-head">
+        <div class="editor-tools">
+          <button data-tool="pen" class="active">畫筆</button>
+          <button data-tool="arrow">箭頭</button>
+          <button data-tool="circle">圓圈</button>
+          <button data-tool="text">文字</button>
+          <button data-tool="number">編號</button>
+          <input id="colorPicker" type="color" value="#ff0000" title="顏色">
+          <label>粗細 <input id="lineWidth" type="range" min="1" max="12" value="3"></label>
+          <label>下次編號 <input id="stampNumber" type="number" min="1" value="1" style="width:70px"></label>
+        </div>
+        <div class="editor-tools">
+          <button id="undoBtn">復原</button>
+          <button class="primary" id="saveEditBtn">儲存</button>
+          <button id="closeEditorBtn">取消</button>
+        </div>
+      </div>
+      <div class="canvas-wrap" id="canvasWrap"><canvas id="editorCanvas"></canvas></div>
+    </div>
+  </div>
+
+  <div class="text-pop" id="textPop">
+    <input id="textInput" placeholder="輸入文字">
+    <button class="primary" id="textOkBtn">加入</button>
+  </div>
+
+  <script>
+    const state = { photos: [], pending: [], dragged: null, pendingDragged: null, editingId: null };
+    const editor = {
+      tool: 'pen', color: '#ff0000', width: 3, image: null, drawing: false,
+      start: null, preview: null, history: [], step: -1, textPos: null,
+      objects: [], selected: null, action: null, handle: null, dragStart: null,
+      objectStart: null, penLayer: document.createElement('canvas')
+    };
+    const $ = (id) => document.getElementById(id);
+
+    function uid() { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
+    function pages() { return Math.ceil(state.photos.length / 2); }
+    function setButtons() {
+      $('countText').textContent = `目前張數：${state.photos.length} 張（${pages()} 頁）`;
+      $('printBtn').disabled = state.photos.length === 0;
+      $('clearBtn').disabled = state.photos.length === 0;
+    }
+    function revokePhoto(photo) {
+      if (photo && photo.url && photo.url.startsWith('blob:')) URL.revokeObjectURL(photo.url);
+    }
+    function readImageFile(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve({ id: uid(), url: reader.result, location: '', description: '' });
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+    function render() {
+      setButtons();
+      const grid = $('photoGrid');
+      grid.innerHTML = '';
+      if (!state.photos.length) {
+        grid.innerHTML = '<div class="empty"><h2>尚未上傳照片</h2><p>請點擊上方按鈕選擇照片。</p></div>';
+        renderPrint();
+        return;
+      }
+      state.photos.forEach((photo, index) => {
+        const card = document.createElement('article');
+        card.className = 'card';
+        card.draggable = true;
+        card.dataset.index = index;
+        card.innerHTML = `
+          <div class="card-top">
+            <span class="handle" title="拖曳排序">⋮⋮</span>
+            <strong>第 ${index + 1} 張</strong>
+            <div>
+              <button class="icon" data-action="up" title="上移">↑</button>
+              <button class="icon" data-action="down" title="下移">↓</button>
+            </div>
+          </div>
+          <div class="photo-box">
+            <img src="${photo.url}" alt="照片 ${index + 1}">
+            <span class="badge">${index + 1}</span>
+          </div>
+          <div class="row"><label>地</label><input data-field="location" value="${escapeAttr(photo.location)}" placeholder="地點"></div>
+          <div class="row"><label>說</label><textarea data-field="description" rows="2" placeholder="說明">${escapeHtml(photo.description)}</textarea></div>
+          <div class="card-actions">
+            <button data-action="edit">編輯照片</button>
+            <button class="danger" data-action="remove">刪除</button>
+          </div>`;
+        card.addEventListener('dragstart', (e) => { state.dragged = index; card.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
+        card.addEventListener('dragover', (e) => e.preventDefault());
+        card.addEventListener('drop', (e) => { e.preventDefault(); moveByDrag(index); });
+        card.addEventListener('dragend', () => { state.dragged = null; card.classList.remove('dragging'); });
+        card.querySelectorAll('[data-field]').forEach(el => el.addEventListener('input', () => {
+          photo[el.dataset.field] = el.value;
+          renderPrint();
+        }));
+        card.addEventListener('click', (e) => handleCardClick(e, index));
+        grid.appendChild(card);
+      });
+      renderPrint();
+    }
+    function escapeHtml(s='') { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function escapeAttr(s='') { return escapeHtml(s).replace(/\n/g, '&#10;'); }
+    function handleCardClick(e, index) {
+      const action = e.target.closest('button')?.dataset.action;
+      if (!action) return;
+      if (action === 'up') movePhoto(index, -1);
+      if (action === 'down') movePhoto(index, 1);
+      if (action === 'remove' && confirm('確定刪除這張照片？')) { revokePhoto(state.photos[index]); state.photos.splice(index, 1); render(); }
+      if (action === 'edit') openEditor(state.photos[index]);
+    }
+    function movePhoto(index, delta) {
+      const to = index + delta;
+      if (to < 0 || to >= state.photos.length) return;
+      [state.photos[index], state.photos[to]] = [state.photos[to], state.photos[index]];
+      render();
+    }
+    function moveByDrag(target) {
+      if (state.dragged === null || state.dragged === target) return;
+      const [item] = state.photos.splice(state.dragged, 1);
+      state.photos.splice(target, 0, item);
+      state.dragged = null;
+      render();
+    }
+    function renderPrint() {
+      const area = $('printArea');
+      area.innerHTML = '';
+      for (let p = 0; p < pages(); p++) {
+        const pagePhotos = state.photos.slice(p * 2, p * 2 + 2);
+        const page = document.createElement('div');
+        page.className = 'page';
+        page.innerHTML = `<div class="print-title">照片黏貼紀錄表</div><div class="records"></div><div class="print-footer">Page ${p + 1} / ${pages()}</div>`;
+        const records = page.querySelector('.records');
+        pagePhotos.forEach((photo, i) => records.appendChild(printRecord(photo, p * 2 + i + 1)));
+        if (pagePhotos.length === 1) records.appendChild(printRecord(null, p * 2 + 2));
+        area.appendChild(page);
+      }
+    }
+    function printRecord(photo, no) {
+      const div = document.createElement('div');
+      div.className = 'record' + (photo ? '' : ' blank');
+      div.innerHTML = `
+        <div class="record-photo">${photo ? `<img src="${photo.url}" alt="record">` : '<span>空白欄位</span>'}</div>
+        <div class="record-info">
+          <div class="info-cell"><div class="info-label">地 點</div><div class="info-value">${escapeHtml(photo?.location || '（未填寫）')}</div></div>
+          <div class="info-cell"><div class="info-label">說 明</div><div class="info-value desc">${escapeHtml(photo?.description || '（未填寫）')}</div></div>
+          <div class="info-cell"><div class="info-label">編 號</div><div class="info-value no">${no}</div></div>
+        </div>`;
+      return div;
+    }
+
+    $('pickBtn').onclick = () => $('fileInput').click();
+    $('fileInput').onchange = async (e) => {
+      const files = [...e.target.files].filter(f => f.type.startsWith('image/'));
+      state.pending = await Promise.all(files.map(readImageFile));
+      e.target.value = '';
+      renderPending();
+    };
+    function renderPending() {
+      $('pendingCount').textContent = `${state.pending.length} 張`;
+      const grid = $('pendingGrid');
+      grid.innerHTML = '';
+      state.pending.forEach((photo, index) => {
+        const div = document.createElement('div');
+        div.className = 'pending';
+        div.draggable = true;
+        div.innerHTML = `<img src="${photo.url}" alt=""><span class="num">${index + 1}</span><button class="remove danger icon">×</button>`;
+        div.addEventListener('dragstart', () => { state.pendingDragged = index; div.classList.add('dragging'); });
+        div.addEventListener('dragover', (e) => e.preventDefault());
+        div.addEventListener('drop', (e) => {
+          e.preventDefault();
+          if (state.pendingDragged === null || state.pendingDragged === index) return;
+          const [item] = state.pending.splice(state.pendingDragged, 1);
+          state.pending.splice(index, 0, item);
+          state.pendingDragged = null;
+          renderPending();
+        });
+        div.addEventListener('dragend', () => { state.pendingDragged = null; div.classList.remove('dragging'); });
+        div.querySelector('.remove').onclick = (e) => { e.stopPropagation(); revokePhoto(state.pending[index]); state.pending.splice(index, 1); renderPending(); };
+        grid.appendChild(div);
+      });
+      $('pendingModal').classList.toggle('show', state.pending.length > 0);
+    }
+    $('confirmImportBtn').onclick = () => { state.photos.push(...state.pending); state.pending = []; $('pendingModal').classList.remove('show'); render(); };
+    $('cancelImportBtn').onclick = () => { state.pending.forEach(revokePhoto); state.pending = []; $('pendingModal').classList.remove('show'); };
+    $('applyBatchBtn').onclick = () => {
+      const loc = $('globalLocation').value.trim();
+      const desc = $('globalDescription').value.trim();
+      if (!state.photos.length) return alert('請先上傳照片。');
+      if (!loc && !desc) return alert('請至少輸入統一地點或統一說明。');
+      state.photos.forEach(p => {
+        if (loc && !p.location.trim()) p.location = loc;
+        if (desc && !p.description.trim()) p.description = desc;
+      });
+      render();
+    };
+    $('printBtn').onclick = () => { renderPrint(); window.print(); };
+    $('clearBtn').onclick = () => {
+      if (!confirm('確定清空全部照片？')) return;
+      state.photos.forEach(revokePhoto); state.photos = []; render();
+    };
+    $('saveProjectBtn').onclick = () => {
+      const blob = new Blob([JSON.stringify({ version: 1, photos: state.photos }, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = '照片黏貼紀錄表專案.json';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 500);
+    };
+    $('loadProjectBtn').onclick = () => $('projectInput').click();
+    $('projectInput').onchange = async (e) => {
+      const file = e.target.files[0]; if (!file) return;
+      try {
+        const data = JSON.parse(await file.text());
+        if (!Array.isArray(data.photos)) throw new Error('格式錯誤');
+        state.photos.forEach(revokePhoto);
+        state.photos = data.photos.map(p => ({
+          ...p,
+          id: p.id || uid(),
+          url: p.url,
+          originalUrl: p.originalUrl || p.url,
+          location: p.location || '',
+          description: p.description || ''
+        }));
+        render();
+      } catch (err) { alert('專案檔無法讀取。'); }
+      e.target.value = '';
+    };
+
+    const canvas = $('editorCanvas');
+    const ctx = canvas.getContext('2d');
+    document.querySelectorAll('[data-tool]').forEach(btn => btn.onclick = () => {
+      editor.tool = btn.dataset.tool;
+      document.querySelectorAll('[data-tool]').forEach(b => b.classList.toggle('active', b === btn));
+    });
+    $('colorPicker').oninput = e => editor.color = e.target.value;
+    $('lineWidth').oninput = e => editor.width = Number(e.target.value);
+    function openEditor(photo) {
+      state.editingId = photo.id;
+      editor.history = []; editor.step = -1; editor.objects = []; editor.selected = null;
+      editor.action = null; editor.preview = null; editor.drawing = false; editor.image = new Image();
+      if (!photo.originalUrl) photo.originalUrl = photo.url;
+      editor.image.onload = () => {
+        const maxW = Math.min(window.innerWidth * .86, 1050);
+        const maxH = Math.min(window.innerHeight * .62, 720);
+        const ratio = Math.min(maxW / editor.image.width, maxH / editor.image.height, 1);
+        canvas.width = Math.round(editor.image.width * ratio);
+        canvas.height = Math.round(editor.image.height * ratio);
+        editor.penLayer.width = canvas.width;
+        editor.penLayer.height = canvas.height;
+        editor.penLayer.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+        loadPhotoEditorState(photo);
+        $('stampNumber').value = photo.editorState?.nextNumber || nextNumberFromObjects(editor.objects);
+        renderEditor();
+        $('editorModal').classList.add('show');
+      };
+      editor.image.src = photo.originalUrl;
+    }
+    function loadPhotoEditorState(photo) {
+      const saved = photo.editorState;
+      if (!saved) return;
+      const sx = saved.canvasW ? canvas.width / saved.canvasW : 1;
+      const sy = saved.canvasH ? canvas.height / saved.canvasH : sx;
+      editor.objects = (saved.objects || []).map(obj => scaleObject(obj, sx, sy));
+      if (saved.pen) {
+        const penImg = new Image();
+        penImg.onload = () => {
+          editor.penLayer.getContext('2d').drawImage(penImg, 0, 0, canvas.width, canvas.height);
+          renderEditor();
+        };
+        penImg.src = saved.pen;
+      }
+    }
+    function scaleObject(obj, sx, sy) {
+      const out = JSON.parse(JSON.stringify(obj));
+      if (out.type === 'arrow') { out.x1 *= sx; out.y1 *= sy; out.x2 *= sx; out.y2 *= sy; out.width = (out.width || 3) * ((sx + sy) / 2); }
+      if (out.type === 'circle' || out.type === 'number') { out.x *= sx; out.y *= sy; out.r *= ((sx + sy) / 2); out.width = (out.width || 3) * ((sx + sy) / 2); }
+      if (out.type === 'text') { out.x *= sx; out.y *= sy; out.size *= ((sx + sy) / 2); out.width = (out.width || 3) * ((sx + sy) / 2); }
+      return out;
+    }
+    function nextNumberFromObjects(objects) {
+      const nums = objects.filter(o => o.type === 'number').map(o => Number(o.n) || 0);
+      return nums.length ? Math.max(...nums) + 1 : 1;
+    }
+    function captureEditorState() {
+      return {
+        canvasW: canvas.width,
+        canvasH: canvas.height,
+        pen: editor.penLayer.toDataURL(),
+        objects: JSON.parse(JSON.stringify(editor.objects)),
+        nextNumber: Number($('stampNumber').value) || nextNumberFromObjects(editor.objects)
+      };
+    }
+    function renderEditor(showSelection = true) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(editor.image, 0, 0, canvas.width, canvas.height);
+      ctx.drawImage(editor.penLayer, 0, 0);
+      editor.objects.forEach((obj, i) => drawObject(obj, showSelection && i === editor.selected));
+      if (editor.preview) drawObject(editor.preview, false);
+    }
+    function saveEditorHistory() {
+      editor.history = editor.history.slice(0, editor.step + 1);
+      editor.history.push({
+        pen: editor.penLayer.toDataURL(),
+        objects: JSON.parse(JSON.stringify(editor.objects)),
+        nextNumber: Number($('stampNumber').value) || nextNumberFromObjects(editor.objects)
+      });
+      editor.step = editor.history.length - 1;
+    }
+    function restoreEditorHistory(item) {
+      editor.objects = JSON.parse(JSON.stringify(item?.objects || []));
+      editor.selected = null;
+      $('stampNumber').value = item?.nextNumber || nextNumberFromObjects(editor.objects);
+      const penCtx = editor.penLayer.getContext('2d');
+      penCtx.clearRect(0, 0, canvas.width, canvas.height);
+      if (!item?.pen) return renderEditor();
+      const img = new Image();
+      img.onload = () => { penCtx.drawImage(img, 0, 0); renderEditor(); };
+      img.src = item.pen;
+    }
+    $('undoBtn').onclick = () => {
+      if (editor.step >= 0) editor.step -= 1;
+      restoreEditorHistory(editor.history[editor.step]);
+    };
+    canvas.onmousedown = (e) => {
+      const pos = mouse(e);
+      const hit = hitTest(pos);
+      if (hit) {
+        if (hit.delete) {
+          editor.selected = hit.index;
+          deleteSelectedObject();
+          return;
+        }
+        editor.selected = hit.index;
+        editor.action = hit.handle ? 'resize' : 'move';
+        editor.handle = hit.handle;
+        editor.dragStart = pos;
+        editor.objectStart = JSON.parse(JSON.stringify(editor.objects[hit.index]));
+        renderEditor();
+        return;
+      }
+      if (editor.tool === 'text') return showTextPop(e.clientX, e.clientY, pos);
+      if (editor.tool === 'number') return addNumber(pos);
+      editor.selected = null;
+      editor.drawing = true; editor.start = pos; editor.preview = null;
+      if (editor.tool === 'pen') {
+        const pctx = editor.penLayer.getContext('2d');
+        pctx.beginPath(); pctx.moveTo(pos.x, pos.y); pctx.strokeStyle = editor.color; pctx.lineWidth = editor.width; pctx.lineCap = 'round'; pctx.lineJoin = 'round';
+      }
+      renderEditor();
+    };
+    canvas.onmousemove = (e) => {
+      const pos = mouse(e);
+      if (editor.action) {
+        updateObjectTransform(pos);
+        renderEditor();
+        return;
+      }
+      if (!editor.drawing) return;
+      if (editor.tool === 'pen') {
+        const pctx = editor.penLayer.getContext('2d');
+        pctx.lineTo(pos.x, pos.y); pctx.stroke(); renderEditor(); return;
+      }
+      if (editor.tool === 'circle') editor.preview = { type: 'circle', x: editor.start.x, y: editor.start.y, r: Math.hypot(pos.x - editor.start.x, pos.y - editor.start.y), color: editor.color, width: editor.width };
+      if (editor.tool === 'arrow') editor.preview = { type: 'arrow', x1: editor.start.x, y1: editor.start.y, x2: pos.x, y2: pos.y, color: editor.color, width: editor.width };
+      renderEditor();
+    };
+    window.onmouseup = () => {
+      if (editor.action) {
+        editor.action = null; editor.handle = null; editor.dragStart = null; editor.objectStart = null;
+        saveEditorHistory();
+      }
+      if (editor.drawing) {
+        editor.drawing = false;
+        if (editor.preview) {
+          editor.objects.push(editor.preview);
+          editor.selected = editor.objects.length - 1;
+          editor.preview = null;
+        }
+        saveEditorHistory();
+        renderEditor();
+      }
+    };
+    function mouse(e) { const r = canvas.getBoundingClientRect(); return { x: (e.clientX - r.left) * canvas.width / r.width, y: (e.clientY - r.top) * canvas.height / r.height }; }
+    function drawObject(obj, selected) {
+      ctx.save();
+      ctx.strokeStyle = obj.color; ctx.fillStyle = obj.color; ctx.lineWidth = obj.width || 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      if (obj.type === 'arrow') { ctx.beginPath(); drawArrow(obj.x1, obj.y1, obj.x2, obj.y2, obj.width || 3); ctx.stroke(); }
+      if (obj.type === 'circle') { ctx.beginPath(); ctx.arc(obj.x, obj.y, obj.r, 0, Math.PI * 2); ctx.stroke(); }
+      if (obj.type === 'text') { ctx.font = `${obj.size}px Arial`; ctx.textBaseline = 'top'; ctx.fillText(obj.text, obj.x, obj.y); }
+      if (obj.type === 'number') {
+        ctx.beginPath(); ctx.arc(obj.x, obj.y, obj.r, 0, Math.PI * 2); ctx.fill();
+        const c = obj.color.replace('#', ''), rr = parseInt(c.slice(0,2),16), gg = parseInt(c.slice(2,4),16), bb = parseInt(c.slice(4,6),16);
+        ctx.fillStyle = rr * .299 + gg * .587 + bb * .114 > 186 ? '#000' : '#fff';
+        ctx.font = `bold ${obj.r * 1.25}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(String(obj.n), obj.x, obj.y + obj.r * .06);
+      }
+      ctx.restore();
+      if (selected) drawSelection(obj);
+    }
+    function drawArrow(x1, y1, x2, y2, width = editor.width) {
+      const h = width * 4 + 8, a = Math.atan2(y2 - y1, x2 - x1);
+      ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
+      ctx.lineTo(x2 - h * Math.cos(a - Math.PI / 6), y2 - h * Math.sin(a - Math.PI / 6));
+      ctx.moveTo(x2, y2);
+      ctx.lineTo(x2 - h * Math.cos(a + Math.PI / 6), y2 - h * Math.sin(a + Math.PI / 6));
+    }
+    function addNumber(pos) {
+      const n = Number($('stampNumber').value) || 1;
+      const r = editor.width * 3 + 12;
+      editor.objects.push({ type: 'number', x: pos.x, y: pos.y, r, n, color: editor.color, width: editor.width });
+      editor.selected = editor.objects.length - 1;
+      $('stampNumber').value = n + 1;
+      saveEditorHistory();
+      renderEditor();
+    }
+    function showTextPop(x, y, pos) {
+      editor.textPos = pos; $('textInput').value = ''; const pop = $('textPop');
+      pop.style.left = `${x}px`; pop.style.top = `${y}px`; pop.style.display = 'flex'; $('textInput').focus();
+    }
+    $('textOkBtn').onclick = () => {
+      const text = $('textInput').value;
+      if (text && editor.textPos) {
+        editor.objects.push({ type: 'text', x: editor.textPos.x, y: editor.textPos.y, text, size: editor.width * 6 + 10, color: editor.color, width: editor.width });
+        editor.selected = editor.objects.length - 1;
+        saveEditorHistory();
+        renderEditor();
+      }
+      $('textPop').style.display = 'none'; editor.textPos = null;
+    };
+    $('saveEditBtn').onclick = () => {
+      const p = state.photos.find(x => x.id === state.editingId);
+      if (p) {
+        p.editorState = captureEditorState();
+        const oldSelected = editor.selected;
+        editor.selected = null;
+        renderEditor(false);
+        p.url = canvas.toDataURL('image/png');
+        editor.selected = oldSelected;
+      }
+      $('editorModal').classList.remove('show'); state.editingId = null; render();
+    };
+    $('closeEditorBtn').onclick = () => { $('editorModal').classList.remove('show'); state.editingId = null; };
+    function drawSelection(obj) {
+      const box = objectBox(obj), handles = objectHandles(obj);
+      ctx.save(); ctx.strokeStyle = '#2563eb'; ctx.lineWidth = 1; ctx.setLineDash([5, 4]); ctx.strokeRect(box.x, box.y, box.w, box.h); ctx.setLineDash([]);
+      ctx.fillStyle = '#fff'; ctx.strokeStyle = '#2563eb'; ctx.lineWidth = 2;
+      handles.forEach(h => { ctx.beginPath(); ctx.rect(h.x - 5, h.y - 5, 10, 10); ctx.fill(); ctx.stroke(); });
+      const del = deleteHandle(obj);
+      ctx.fillStyle = '#dc2626'; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(del.x, del.y, 9, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#ffffff'; ctx.font = 'bold 13px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('×', del.x, del.y);
+      ctx.restore();
+    }
+    function objectBox(obj) {
+      if (obj.type === 'arrow') return normBox(obj.x1, obj.y1, obj.x2, obj.y2, 12);
+      if (obj.type === 'circle' || obj.type === 'number') return { x: obj.x - obj.r, y: obj.y - obj.r, w: obj.r * 2, h: obj.r * 2 };
+      const width = ctx.measureText ? measureTextWidth(obj) : obj.text.length * obj.size * .55;
+      return { x: obj.x, y: obj.y, w: width, h: obj.size * 1.2 };
+    }
+    function objectHandles(obj) {
+      if (obj.type === 'arrow') return [{ name: 'start', x: obj.x1, y: obj.y1 }, { name: 'end', x: obj.x2, y: obj.y2 }];
+      if (obj.type === 'circle' || obj.type === 'number') return [{ name: 'radius', x: obj.x + obj.r, y: obj.y }];
+      const b = objectBox(obj); return [{ name: 'size', x: b.x + b.w, y: b.y + b.h }];
+    }
+    function deleteHandle(obj) {
+      const b = objectBox(obj);
+      return { x: b.x + b.w + 10, y: b.y - 10 };
+    }
+    function measureTextWidth(obj) {
+      ctx.save(); ctx.font = `${obj.size}px Arial`; const w = ctx.measureText(obj.text).width; ctx.restore(); return w;
+    }
+    function normBox(x1, y1, x2, y2, pad = 0) {
+      const x = Math.min(x1, x2) - pad, y = Math.min(y1, y2) - pad;
+      return { x, y, w: Math.abs(x2 - x1) + pad * 2, h: Math.abs(y2 - y1) + pad * 2 };
+    }
+    function hitTest(pos) {
+      for (let i = editor.objects.length - 1; i >= 0; i--) {
+        if (i === editor.selected) {
+          const del = deleteHandle(editor.objects[i]);
+          if (Math.hypot(pos.x - del.x, pos.y - del.y) <= 12) return { index: i, delete: true };
+        }
+        for (const h of objectHandles(editor.objects[i])) {
+          if (Math.hypot(pos.x - h.x, pos.y - h.y) <= 10) return { index: i, handle: h.name };
+        }
+        if (insideObject(pos, editor.objects[i])) return { index: i };
+      }
+      return null;
+    }
+    function insideObject(pos, obj) {
+      if (obj.type === 'arrow') return pointLineDistance(pos, { x: obj.x1, y: obj.y1 }, { x: obj.x2, y: obj.y2 }) <= 10;
+      if (obj.type === 'circle') return Math.abs(Math.hypot(pos.x - obj.x, pos.y - obj.y) - obj.r) <= 10 || Math.hypot(pos.x - obj.x, pos.y - obj.y) < obj.r;
+      if (obj.type === 'number') return Math.hypot(pos.x - obj.x, pos.y - obj.y) <= obj.r;
+      const b = objectBox(obj); return pos.x >= b.x && pos.x <= b.x + b.w && pos.y >= b.y && pos.y <= b.y + b.h;
+    }
+    function pointLineDistance(p, a, b) {
+      const dx = b.x - a.x, dy = b.y - a.y, len2 = dx * dx + dy * dy || 1;
+      const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2));
+      return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+    }
+    function updateObjectTransform(pos) {
+      const obj = editor.objects[editor.selected], start = editor.objectStart;
+      const dx = pos.x - editor.dragStart.x, dy = pos.y - editor.dragStart.y;
+      if (editor.action === 'move') {
+        if (obj.type === 'arrow') { obj.x1 = start.x1 + dx; obj.y1 = start.y1 + dy; obj.x2 = start.x2 + dx; obj.y2 = start.y2 + dy; }
+        else { obj.x = start.x + dx; obj.y = start.y + dy; }
+        return;
+      }
+      if (obj.type === 'arrow') {
+        if (editor.handle === 'start') { obj.x1 = pos.x; obj.y1 = pos.y; }
+        if (editor.handle === 'end') { obj.x2 = pos.x; obj.y2 = pos.y; }
+      } else if (obj.type === 'circle' || obj.type === 'number') {
+        obj.r = Math.max(8, Math.hypot(pos.x - obj.x, pos.y - obj.y));
+      } else if (obj.type === 'text') {
+        obj.size = Math.max(10, start.size + Math.max(dx, dy) * .35);
+      }
+    }
+    function deleteSelectedObject() {
+      if (editor.selected === null || !editor.objects[editor.selected]) return;
+      editor.objects.splice(editor.selected, 1);
+      editor.selected = null;
+      saveEditorHistory();
+      renderEditor();
+    }
+    window.addEventListener('keydown', (e) => {
+      if (!$('editorModal').classList.contains('show')) return;
+      if (e.target && ['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+      if (e.key === 'Delete' || e.key === 'Del') {
+        e.preventDefault();
+        deleteSelectedObject();
+      }
+    });
+    render();
+  </script>
+</body>
+</html>

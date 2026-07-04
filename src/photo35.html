@@ -122,7 +122,7 @@
           <span class="count" id="countText">目前張數：0 張（0 頁）</span>
         </div>
         <div class="bar-right">
-          <span class="count" id="versionText">v1.0.3</span>
+          <span class="count" id="versionText">v1.0.4</span>
           <button id="updateBtn">檢查更新</button>
           <select id="wordMode">
             <option value="two_landscape">1頁2張橫式</option>
@@ -195,7 +195,7 @@
   </div>
 
   <script>
-    const APP_VERSION = 'v1.0.3';
+    const APP_VERSION = 'v1.0.4';
     const state = { photos: [], pending: [], dragged: null, pendingDragged: null, editingId: null };
     const editor = {
       tool: 'pen', color: '#ff0000', width: 3, image: null, drawing: false,
@@ -409,8 +409,10 @@
     $('printBtn').onclick = () => { renderPrint(); window.print(); };
     $('exportWordBtn').onclick = async () => {
       if (!state.photos.length) return alert('請先匯入照片');
-      if (!window.pywebview?.api?.export_word_template) {
-        alert('目前不是桌面版，無法匯出 Word 模板');
+      const api = window.pywebview?.api;
+      const exportWord = api?.export_word_template || api?.exportWordTemplate;
+      if (!exportWord) {
+        alert('目前沒有偵測到 Word 匯出功能，請確認是 v1.0.4 以上桌面版，或重新開啟程式後再試。');
         return;
       }
       const btn = $('exportWordBtn');
@@ -423,7 +425,7 @@
           title: 'Kobe強強照片黏貼',
           photos: state.photos
         });
-        const result = await window.pywebview.api.export_word_template(payload);
+        const result = await exportWord.call(api, payload);
         if (result?.ok) alert(`Word 已匯出：\n${result.path}`);
         else if (!result?.cancelled) alert(`匯出 Word 失敗：${result?.error || '未知錯誤'}`);
       } finally {

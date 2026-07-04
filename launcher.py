@@ -82,6 +82,9 @@ class ProjectApi:
         except Exception as exc:
             return {"ok": False, "error": str(exc)}
 
+    def exportWordTemplate(self, payload: str) -> dict:
+        return self.export_word_template(payload)
+
     def check_update(self, current_version: str) -> dict:
         try:
             release = fetch_json(REPO_API)

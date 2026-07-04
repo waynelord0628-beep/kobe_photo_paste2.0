@@ -1,64 +1,62 @@
 # Kobe強強照片黏貼
 
-本專案是離線本機版照片黏貼紀錄表工具，可匯入照片、排序、標註、填寫地點與說明，並列印成 A4 紀錄表。
+本機桌面版照片黏貼工具。可匯入照片、排序、填寫地點與說明、編輯標註，並輸出列印或 Word 模板。
 
 ## 功能
 
-- 多張照片匯入
-- 匯入前預覽、刪除、拖曳排序
-- 主畫面照片排序、上下移動
-- 個別填寫地點與說明
-- 統一地點 / 統一說明，只填入空白欄位
-- 照片標註：畫筆、箭頭、圓圈、文字、編號
-- 箭頭、圓圈、文字、編號可選取、移動、調整大小
-- 選取物件後可按物件上的 X 或鍵盤 Delete 刪除
-- 同一張照片重新開啟編輯時，編號會接續該照片上次的下一號
-- A4 列印，每頁 2 張照片
-- 專案儲存 / 載入 JSON，照片與標註狀態會一起保存
-- 透過 GitHub Releases 檢查並安裝新版
+- 多張照片匯入與拖曳排序
+- 匯入前預覽排序與刪除
+- 地點、說明欄位與批次填入
+- 編輯照片標註：筆、箭頭、圓圈、文字、編號
+- 箭頭、圓圈、文字、編號可作為物件移動、調整大小、刪除
+- `Delete` 鍵可刪除目前選取的標註物件
+- 專案儲存與載入 JSON
+- A4 列印模式
+- Word 模板匯出
+- GitHub Releases 檢查更新與自動替換新版 exe
 
-## 直接使用
+## Word 模板
 
-已打包版本放在：
+程式沿用舊版 Word 模板設定，並新增較密集的直式照片版型。
 
-```text
-dist/Kobe強強照片黏貼.exe
-```
+目前支援：
 
-執行後會開啟本機桌面視窗，不會跳出瀏覽器分頁。
+- `1頁2張橫式`：一頁上下 2 張，適合橫式照片
+- `1頁2張直式`：一頁左右 2 張，適合直式照片
+- `1頁3張橫式`：橫向 A4，一頁 3 張
+- `1頁4張直式`：直式 A4，2 欄 x 2 排
+- `1頁6張直式`：橫向 A4，3 欄 x 2 排
 
-## 更新方式
+匯出時會依照目前畫面上的照片順序輸出，並使用照片卡片內的「說明」作為 Word 說明文字；若沒有說明，會改用地點；兩者都沒有時使用照片編號。
 
-程式內可按「檢查更新」。如果 GitHub Releases 有新版，程式會下載新版 exe，關閉目前版本後自動替換並重新啟動。
-
-## 開發方式
-
-主要程式在：
-
-```text
-src/photo35.html
-```
-
-可直接用瀏覽器打開 `src/photo35.html` 測試功能。
-
-## 打包方式
-
-需要 Python 與 PyInstaller：
+## 開發執行
 
 ```powershell
 pip install -r requirements.txt
-pyinstaller --noconsole --onefile --name "Kobe強強照片黏貼" --collect-all webview --add-data "src/photo35.html;." launcher.py
+python launcher.py
 ```
 
-打包完成後，exe 會在：
+## 打包 exe
+
+```powershell
+pip install -r requirements.txt
+pyinstaller --noconsole --onefile --name "Kobe強強照片黏貼" --collect-all webview --add-data "src/photo35.html;." --add-data "templates;templates" launcher.py
+```
+
+輸出檔會在：
 
 ```text
 dist/Kobe強強照片黏貼.exe
 ```
 
+## 更新
+
+程式內可按「檢查更新」。如果 GitHub Releases 有新版，程式會下載新版 exe，關閉目前版本後自動替換並重新啟動。
+
 ## 檔案說明
 
-- `src/photo35.html`：主程式，離線單頁 HTML app
-- `launcher.py`：本機桌面視窗啟動器
-- `requirements.txt`：打包所需 Python 套件
-- `dist/Kobe強強照片黏貼.exe`：目前打包好的 Windows 執行檔
+- `src/photo35.html`：主要前端介面
+- `launcher.py`：桌面版啟動器與 pywebview API
+- `template_export.py`：Word 模板匯出功能
+- `templates/`：Word 模板檔
+- `requirements.txt`：Python 依賴

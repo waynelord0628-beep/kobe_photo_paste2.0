@@ -9,6 +9,8 @@ import threading
 import urllib.request
 from pathlib import Path
 
+from template_export import export_word
+
 
 APP_TITLE = "Kobe強強照片黏貼"
 HTML_NAME = "photo35.html"
@@ -39,6 +41,43 @@ class ProjectApi:
             if target.suffix.lower() != ".json":
                 target = target.with_suffix(".json")
             target.write_text(content, encoding="utf-8")
+            return {"ok": True, "path": str(target)}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+
+    def export_word_template(self, payload: str) -> dict:
+        try:
+            import webview
+
+            if self.window is None:
+                return {"ok": False, "error": "視窗尚未準備完成"}
+
+            data = json.loads(payload)
+            title = data.get("title") or "Kobe強強照片黏貼"
+            selected = self.window.create_file_dialog(
+                webview.SAVE_DIALOG,
+                save_filename=f"{title}.docx",
+                file_types=("Word 文件 (*.docx)", "所有檔案 (*.*)"),
+            )
+            if not selected:
+                return {"ok": False, "cancelled": True}
+
+            path = selected if isinstance(selected, str) else selected[0]
+            target = Path(path)
+            if target.suffix.lower() != ".docx":
+                target = target.with_suffix(".docx")
+
+            generated = export_word(
+                template_dir=resource_path("templates"),
+                output_dir=target.parent,
+                mode=str(data.get("mode") or ""),
+                title=target.stem,
+                photos=list(data.get("photos") or []),
+            )
+            if generated != target:
+                if target.exists():
+                    target.unlink()
+                generated.rename(target)
             return {"ok": True, "path": str(target)}
         except Exception as exc:
             return {"ok": False, "error": str(exc)}

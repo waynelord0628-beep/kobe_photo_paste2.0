@@ -109,8 +109,16 @@
           <span class="count" id="countText">目前張數：0 張（0 頁）</span>
         </div>
         <div class="bar-right">
-          <span class="count" id="versionText">v1.0.1</span>
+          <span class="count" id="versionText">v1.0.2</span>
           <button id="updateBtn">檢查更新</button>
+          <select id="wordMode">
+            <option value="two_landscape">1頁2張橫式</option>
+            <option value="two_portrait">1頁2張直式</option>
+            <option value="three_landscape">1頁3張橫式</option>
+            <option value="four_portrait">1頁4張直式</option>
+            <option value="six_portrait">1頁6張直式</option>
+          </select>
+          <button class="success" id="exportWordBtn" disabled>匯出Word</button>
           <button class="primary" id="printBtn" disabled>列印</button>
           <button class="danger" id="clearBtn" disabled>清空</button>
         </div>
@@ -174,7 +182,7 @@
   </div>
 
   <script>
-    const APP_VERSION = 'v1.0.1';
+    const APP_VERSION = 'v1.0.2';
     const state = { photos: [], pending: [], dragged: null, pendingDragged: null, editingId: null };
     const editor = {
       tool: 'pen', color: '#ff0000', width: 3, image: null, drawing: false,
@@ -189,6 +197,7 @@
     function setButtons() {
       $('countText').textContent = `目前張數：${state.photos.length} 張（${pages()} 頁）`;
       $('printBtn').disabled = state.photos.length === 0;
+      $('exportWordBtn').disabled = state.photos.length === 0;
       $('clearBtn').disabled = state.photos.length === 0;
     }
     function revokePhoto(photo) {
@@ -353,6 +362,30 @@
       render();
     };
     $('printBtn').onclick = () => { renderPrint(); window.print(); };
+    $('exportWordBtn').onclick = async () => {
+      if (!state.photos.length) return alert('請先匯入照片');
+      if (!window.pywebview?.api?.export_word_template) {
+        alert('目前不是桌面版，無法匯出 Word 模板');
+        return;
+      }
+      const btn = $('exportWordBtn');
+      btn.disabled = true;
+      const oldText = btn.textContent;
+      btn.textContent = '匯出中...';
+      try {
+        const payload = JSON.stringify({
+          mode: $('wordMode').value,
+          title: 'Kobe強強照片黏貼',
+          photos: state.photos
+        });
+        const result = await window.pywebview.api.export_word_template(payload);
+        if (result?.ok) alert(`Word 已匯出：\n${result.path}`);
+        else if (!result?.cancelled) alert(`匯出 Word 失敗：${result?.error || '未知錯誤'}`);
+      } finally {
+        btn.textContent = oldText;
+        setButtons();
+      }
+    };
     $('clearBtn').onclick = () => {
       if (!confirm('確定清空全部照片？')) return;
       state.photos.forEach(revokePhoto); state.photos = []; render();

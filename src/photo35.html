@@ -109,6 +109,8 @@
           <span class="count" id="countText">目前張數：0 張（0 頁）</span>
         </div>
         <div class="bar-right">
+          <span class="count" id="versionText">v1.0.1</span>
+          <button id="updateBtn">檢查更新</button>
           <button class="primary" id="printBtn" disabled>列印</button>
           <button class="danger" id="clearBtn" disabled>清空</button>
         </div>
@@ -172,6 +174,7 @@
   </div>
 
   <script>
+    const APP_VERSION = 'v1.0.1';
     const state = { photos: [], pending: [], dragged: null, pendingDragged: null, editingId: null };
     const editor = {
       tool: 'pen', color: '#ff0000', width: 3, image: null, drawing: false,
@@ -310,13 +313,22 @@
         const div = document.createElement('div');
         div.className = 'pending';
         div.draggable = true;
-        div.innerHTML = `<img src="${photo.url}" alt=""><span class="num">${index + 1}</span><button class="remove danger icon">×</button>`;
-        div.addEventListener('dragstart', () => { state.pendingDragged = index; div.classList.add('dragging'); });
-        div.addEventListener('dragover', (e) => e.preventDefault());
+        div.innerHTML = `<img src="${photo.url}" alt="" draggable="false"><span class="num">${index + 1}</span><button class="remove danger icon" draggable="false">×</button>`;
+        div.addEventListener('dragstart', (e) => {
+          state.pendingDragged = index;
+          div.classList.add('dragging');
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', String(index));
+        });
+        div.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+        });
         div.addEventListener('drop', (e) => {
           e.preventDefault();
-          if (state.pendingDragged === null || state.pendingDragged === index) return;
-          const [item] = state.pending.splice(state.pendingDragged, 1);
+          const from = state.pendingDragged ?? Number(e.dataTransfer.getData('text/plain'));
+          if (!Number.isInteger(from) || from === index) return;
+          const [item] = state.pending.splice(from, 1);
           state.pending.splice(index, 0, item);
           state.pendingDragged = null;
           renderPending();
@@ -345,8 +357,15 @@
       if (!confirm('確定清空全部照片？')) return;
       state.photos.forEach(revokePhoto); state.photos = []; render();
     };
-    $('saveProjectBtn').onclick = () => {
-      const blob = new Blob([JSON.stringify({ version: 1, photos: state.photos }, null, 2)], { type: 'application/json' });
+    $('saveProjectBtn').onclick = async () => {
+      const json = JSON.stringify({ version: 1, photos: state.photos }, null, 2);
+      if (window.pywebview?.api?.save_project) {
+        const result = await window.pywebview.api.save_project(json);
+        if (result?.ok) alert(`專案已儲存：\n${result.path}`);
+        else if (!result?.cancelled) alert(`專案儲存失敗：${result?.error || '未知錯誤'}`);
+        return;
+      }
+      const blob = new Blob([json], { type: 'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = '照片黏貼紀錄表專案.json';
@@ -372,6 +391,34 @@
       } catch (err) { alert('專案檔無法讀取。'); }
       e.target.value = '';
     };
+    $('updateBtn').onclick = async () => {
+      if (!window.pywebview?.api?.check_update) {
+        alert('目前不是本機版程式，無法使用自動更新。');
+        return;
+      }
+      const btn = $('updateBtn');
+      btn.disabled = true;
+      btn.textContent = '檢查中...';
+      try {
+        const info = await window.pywebview.api.check_update(APP_VERSION);
+        if (!info?.ok) {
+          alert(`檢查更新失敗：${info?.error || '未知錯誤'}`);
+          return;
+        }
+        if (!info.update) {
+          alert(`目前已是最新版本：${APP_VERSION}`);
+          return;
+        }
+        const yes = confirm(`發現新版 ${info.version}。\n\n是否下載並自動更新？\n程式會關閉並重新開啟。`);
+        if (!yes) return;
+        btn.textContent = '下載中...';
+        const result = await window.pywebview.api.install_update(info.download_url);
+        if (!result?.ok) alert(`更新失敗：${result?.error || '未知錯誤'}`);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '檢查更新';
+      }
+    };
 
     const canvas = $('editorCanvas');
     const ctx = canvas.getContext('2d');
@@ -386,6 +433,7 @@
       editor.history = []; editor.step = -1; editor.objects = []; editor.selected = null;
       editor.action = null; editor.preview = null; editor.drawing = false; editor.image = new Image();
       if (!photo.originalUrl) photo.originalUrl = photo.url;
+      $('stampNumber').value = photo.editorState?.nextNumber || 1;
       editor.image.onload = () => {
         const maxW = Math.min(window.innerWidth * .86, 1050);
         const maxH = Math.min(window.innerHeight * .62, 720);
@@ -585,7 +633,15 @@
       }
       $('editorModal').classList.remove('show'); state.editingId = null; render();
     };
-    $('closeEditorBtn').onclick = () => { $('editorModal').classList.remove('show'); state.editingId = null; };
+    function discardEditorSession() {
+      const p = state.photos.find(x => x.id === state.editingId);
+      $('stampNumber').value = p?.editorState?.nextNumber || 1;
+      editor.objects = []; editor.selected = null; editor.preview = null; editor.action = null;
+      editor.history = []; editor.step = -1; editor.drawing = false; state.editingId = null;
+      $('textPop').style.display = 'none';
+      $('editorModal').classList.remove('show');
+    }
+    $('closeEditorBtn').onclick = discardEditorSession;
     function drawSelection(obj) {
       const box = objectBox(obj), handles = objectHandles(obj);
       ctx.save(); ctx.strokeStyle = '#2563eb'; ctx.lineWidth = 1; ctx.setLineDash([5, 4]); ctx.strokeRect(box.x, box.y, box.w, box.h); ctx.setLineDash([]);

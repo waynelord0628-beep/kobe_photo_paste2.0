@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8">
@@ -89,6 +89,19 @@
       .info-value.no { font-size: 16pt; font-weight: 700; }
       .blank { opacity: .3; }
       .print-footer { text-align: right; font-size: 9pt; color: #666; margin-top: 2mm; }
+      .page.landscape { width: 297mm; height: 210mm; padding: 10mm 12mm 8mm; }
+      .page.landscape .records { height: 170mm; }
+      .records.grid-layout { display: grid; align-items: stretch; }
+      .page.compact .print-title { font-size: 16pt; margin-bottom: 4mm; }
+      .page.compact .records { gap: 3mm; }
+      .page.compact .record-info { height: 15mm; }
+      .page.compact .info-label { font-size: 8pt; padding: .5mm 0; }
+      .page.compact .info-value { font-size: 8pt; padding: .8mm; }
+      .page.compact .info-value.no { font-size: 11pt; }
+      .page.dense .record-info { height: 13mm; }
+      .page.dense .info-label { font-size: 7pt; }
+      .page.dense .info-value { font-size: 7pt; padding: .6mm; }
+      .page.dense .info-value.no { font-size: 10pt; }
     }
   </style>
 </head>
@@ -109,7 +122,7 @@
           <span class="count" id="countText">目前張數：0 張（0 頁）</span>
         </div>
         <div class="bar-right">
-          <span class="count" id="versionText">v1.0.2</span>
+          <span class="count" id="versionText">v1.0.3</span>
           <button id="updateBtn">檢查更新</button>
           <select id="wordMode">
             <option value="two_landscape">1頁2張橫式</option>
@@ -182,7 +195,7 @@
   </div>
 
   <script>
-    const APP_VERSION = 'v1.0.2';
+    const APP_VERSION = 'v1.0.3';
     const state = { photos: [], pending: [], dragged: null, pendingDragged: null, editingId: null };
     const editor = {
       tool: 'pen', color: '#ff0000', width: 3, image: null, drawing: false,
@@ -191,9 +204,28 @@
       objectStart: null, penLayer: document.createElement('canvas')
     };
     const $ = (id) => document.getElementById(id);
+    const PRINT_LAYOUTS = {
+      two_landscape: { label: '1頁2張橫式', perPage: 2, cols: 1, rows: 2, orientation: 'portrait', compact: false, dense: false, gap: '6mm' },
+      two_portrait: { label: '1頁2張直式', perPage: 2, cols: 2, rows: 1, orientation: 'portrait', compact: false, dense: false, gap: '4mm' },
+      three_landscape: { label: '1頁3張橫式', perPage: 3, cols: 3, rows: 1, orientation: 'landscape', compact: true, dense: false, gap: '4mm' },
+      four_portrait: { label: '1頁4張直式', perPage: 4, cols: 2, rows: 2, orientation: 'portrait', compact: true, dense: false, gap: '3mm' },
+      six_portrait: { label: '1頁6張直式', perPage: 6, cols: 3, rows: 2, orientation: 'portrait', compact: true, dense: true, gap: '2mm' }
+    };
 
     function uid() { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
-    function pages() { return Math.ceil(state.photos.length / 2); }
+    function currentPrintLayout() {
+      return PRINT_LAYOUTS[$('wordMode')?.value] || PRINT_LAYOUTS.two_landscape;
+    }
+    function pages() { return Math.ceil(state.photos.length / currentPrintLayout().perPage); }
+    function setPrintPageStyle(layout) {
+      let style = $('printPageStyle');
+      if (!style) {
+        style = document.createElement('style');
+        style.id = 'printPageStyle';
+        document.head.appendChild(style);
+      }
+      style.textContent = `@page { size: A4 ${layout.orientation}; margin: 0; }`;
+    }
     function setButtons() {
       $('countText').textContent = `目前張數：${state.photos.length} 張（${pages()} 頁）`;
       $('printBtn').disabled = state.photos.length === 0;
@@ -283,14 +315,26 @@
     function renderPrint() {
       const area = $('printArea');
       area.innerHTML = '';
+      const layout = currentPrintLayout();
+      setPrintPageStyle(layout);
       for (let p = 0; p < pages(); p++) {
-        const pagePhotos = state.photos.slice(p * 2, p * 2 + 2);
+        const start = p * layout.perPage;
+        const pagePhotos = state.photos.slice(start, start + layout.perPage);
         const page = document.createElement('div');
-        page.className = 'page';
-        page.innerHTML = `<div class="print-title">照片黏貼紀錄表</div><div class="records"></div><div class="print-footer">Page ${p + 1} / ${pages()}</div>`;
+        page.className = [
+          'page',
+          layout.orientation === 'landscape' ? 'landscape' : '',
+          layout.compact ? 'compact' : '',
+          layout.dense ? 'dense' : ''
+        ].filter(Boolean).join(' ');
+        page.innerHTML = `<div class="print-title">照片黏貼紀錄表 - ${layout.label}</div><div class="records grid-layout"></div><div class="print-footer">Page ${p + 1} / ${pages()}</div>`;
         const records = page.querySelector('.records');
-        pagePhotos.forEach((photo, i) => records.appendChild(printRecord(photo, p * 2 + i + 1)));
-        if (pagePhotos.length === 1) records.appendChild(printRecord(null, p * 2 + 2));
+        records.style.gridTemplateColumns = `repeat(${layout.cols}, 1fr)`;
+        records.style.gridTemplateRows = `repeat(${layout.rows}, 1fr)`;
+        records.style.gap = layout.gap;
+        for (let i = 0; i < layout.perPage; i++) {
+          records.appendChild(printRecord(pagePhotos[i] || null, start + i + 1));
+        }
         area.appendChild(page);
       }
     }
@@ -361,6 +405,7 @@
       });
       render();
     };
+    $('wordMode').onchange = () => { setButtons(); renderPrint(); };
     $('printBtn').onclick = () => { renderPrint(); window.print(); };
     $('exportWordBtn').onclick = async () => {
       if (!state.photos.length) return alert('請先匯入照片');
@@ -768,3 +813,4 @@
   </script>
 </body>
 </html>
+

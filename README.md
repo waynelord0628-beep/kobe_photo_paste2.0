@@ -13,6 +13,7 @@
 - 專案儲存與載入 JSON
 - A4 列印模式
 - Word 模板匯出
+- 列印與 Word 匯出共用同一個版型選單
 - GitHub Releases 檢查更新與自動替換新版 exe
 
 ## Word 模板
